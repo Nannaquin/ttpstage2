@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const axios = require("axios")
 
 const keys = require("../../config/keys");
 
@@ -14,7 +15,6 @@ const validatePurchaseInput = require("../../validation/stockRequest");
 // Load User model
 const User = require("../../models/User");
 const Stock = require("../../models/Stock");
-//const UserTransaction = require("../../models/UserTransaction");
 
 const stockInfoParser = require("../../utils/stockInfoParser");
 const stockUpdater = require("../../utils/stockUpdater");
@@ -58,6 +58,7 @@ router.post("/register", (req, res) => {
 });
 
 
+
 // @route POST api/users/login
 // @desc Login user and return JWT token
 // @access Public
@@ -74,17 +75,33 @@ router.post("/login", (req, res) => {
     const email = req.body.email;
     const password = req.body.password;
 
-    console.log(email + ", " + password)
-
     // Find user by email
     User.find({ email }).then(user => {
         
         // Check if user exists
         if(!user) res.status(404).json({ emailnotfound: "Email not found"});
         // Check Password
-        console.log(user)
         bcrypt.compare(password, user[0].password).then(isMatch => {
             if (isMatch) {
+
+                const url = "https://www.alphavantage.co/query?";
+                const func = "function=TIME_SERIES_DAILY&symbol=";
+                let symbol = "";
+                const apiKey = "&apikey=0K96SVX24Y4P72MR"
+                if(user.ownedStocks) {
+                    for(let i = 0; i < user.ownedStocks.length; i++) {
+                        symbol = user.ownedStocks[i].symbol;
+                        axios.get(url + func + symbol + apiKey)
+                        .then(res => {
+                            const obj = res.data["Time Series (Daily)"];
+                            const dateStr = Object.keys(obj)[0];
+                            let info = stockInfoParser(res.data["Time Series (Daily)"][dateStr]);
+                            user.ownedStocks[i].unit_price = info.price
+    
+                        })
+                    }
+                }
+
                 // User matched
                 // make JWT Payload
                 const payload = {
@@ -94,7 +111,6 @@ router.post("/login", (req, res) => {
                     transactions: user[0].transactions,
                     ownedStocks: user[0].ownedStocks
                 };
-                console.log("POST PAYLOAD")
                 // Sign token
                 jwt.sign(
                     payload,
@@ -138,30 +154,10 @@ router.post("/stockRequest", (req, res) => {
 });
 
 router.post("/buyStock", async (req, res) => {
-    console.log("BUY STOCK ROUTE")
-
     await Stock.findOne({ ticker_symbol: req.body.symbol }).then(stock => {
         // If not found stock, make new entry
         const parsedInfo = stockInfoParser(req.body.stockInfo);
         stock = stockUpdater(parsedInfo, stock, req.body.symbol)
- /*       if(!stock) {
-            const newEntry = new Stock({
-                ticker_symbol: req.body.symbol,
-                price: parsedInfo.price,
-                opening_price: parsedInfo.opening_price
-            })
-            newEntry.save()
-            stock = newEntry;
-        }
-        // Else Update info
-        else {
-            stock.overwrite({
-                ticker_symbol: req.body.symbol,
-                price: parsedInfo.price,
-                opening_price: parsedInfo.opening_price
-            });
-            stock.save()
-        } */
         
         const id = req.body.userId;
         const quantity = req.body.quantity;
@@ -179,40 +175,25 @@ router.post("/buyStock", async (req, res) => {
                     stock_quantity: quantity
                 });
 
-                // WAIT MUST DO CHECK AND CHANGE FIRST
-                let owned = user.ownedStocks
-                let queryEntry = owned.pull({symbol: stock.ticker_symbol})
-                console.log("OWNED: " + owned)
-
-                console.log("queryEntry: " + queryEntry)
-                console.log("TO(QUERYENTRY): " + typeof(queryEntry))
-                if(!queryEntry) {
+                let isPresent = false
+                for(let i = 0; i < user.ownedStocks.length; i++) {
+                    if(user.ownedStocks[i].symbol == stock.ticker_symbol) {
+                        console.log("IS PRESENT")
+                        user.ownedStocks[i].quantity = parseInt(user.ownedStocks[i].quantity, 10) + parseInt(quantity, 10)
+                        user.ownedStocks[i].unit_price = parseInt(stock.price, 10)
+                        user.ownedStocks[i].open_price = parseInt(stock.opening_price, 10)
+                        isPresent = true
+                        break
+                    }
+                }
+                if(!isPresent) {
+                    console.log("NOT PRESENT")
                     user.ownedStocks.push({
                         symbol: stock.ticker_symbol,
-                        quantity: quantity
+                        quantity: quantity,
+                        unit_price: stock.price,
+                        open_price: stock.opening_price
                     });
-                    console.log("Pushed a new")
-                } else {
-
-                    User.update(
-                        { },
-                        { $pull: {ownedStocks: {_id : queryEntry._id}}}
-                    )
-                    console.log("EXISTING QUANTITY: " + queryEntry.quantity)
-                    queryEntry["quantity"] += quantity;
-
-                   // owned.remove(queryEntry._id)
-                   User.update(
-                    { },
-                    { $pull: {ownedStocks: {_id : queryEntry._id}}}
-                    )
-
-                    owned = user.ownedStocks
-                    console.log("OWNED: " + owned)
-
-                    console.log("queryEntry: " + queryEntry)
-                    owned.push(queryEntry)
-                    console.log("Pushed an existing")
                 }
                 user.save()
                 .then(user => res.json({
@@ -237,9 +218,100 @@ router.post("/buyStock", async (req, res) => {
 
 router.post("/sellStock", async (req, res) => {
 
+
     // Ensure User has the amount of Stocks they are trying to dump
     // Find current stock price
     // Update stock 
+    await Stock.findOne({ ticker_symbol: req.body.symbol }).then(stock => {
+        // If not found stock, make new entry
+        const parsedInfo = stockInfoParser(req.body.stockInfo);
+        stock = stockUpdater(parsedInfo, stock, req.body.symbol)
+        
+        const id = req.body.userId;
+        const quantity = req.body.quantity;
+        const stockTotal = quantity * stock.price;
 
+        User.findOne({_id: id}).then((user) => {
+            let isValid = false
+            for(let i = 0; i < user.ownedStocks.length; i++) {
+                if(user.ownedStocks[i].symbol == stock.ticker_symbol) {
+                    console.log("IS PRESENT")
+                    if(user.ownedStocks[i].quantity >= quantity) {
+                        user.ownedStocks[i].quantity -= quantity
+                        if(user.ownedStocks[i].quantity == 0) {
+                            // remove it 
+                            user.ownedStocks[i].remove()
+                        } else {
+                            user.ownedStocks[i].unit_price = parseInt(stock.price, 10)
+                        }
+                        user.balance += stockTotal
+                        user.transactions.push({ 
+                            transaction_type: "SELL",
+                            symbol: stock.ticker_symbol,
+                            stock_price: stock.price,
+                            stock_quantity: quantity
+                        });
+                        isValid = true
+                        break
+                    } 
+                    break
+                }
+            }
+            if(isValid) {
+                user.save()
+                .then(user => res.json({
+                id: user._id,
+                name: user.name,
+                balance: user.balance,
+                transactions: user.transactions,
+                ownedStocks: user.ownedStocks
+            }))
+            .catch(err => console.log(err));
+                return res.status(200)
+            }
+            else {
+                return res.status(400).send("Invalid sell attempt")
+            }
+            
+        })
+    })
 })
+
+
+// @route POST api/users/stockRequest
+router.post("/updateStocks", (req, res) => {
+    User.findOne({_id: req.body.id}).then(user => {
+        const url = "https://www.alphavantage.co/query?";
+        const func = "function=TIME_SERIES_DAILY&symbol=";
+        let symbol = "";
+        const apiKey = "&apikey=0K96SVX24Y4P72MR"
+        if(user.ownedStocks) {
+            for(let i = 0; i < user.ownedStocks.length; i++) {
+                symbol = user.ownedStocks[i].symbol;
+                axios.get(url + func + symbol + apiKey)
+                .then(res => {
+                    const obj = res.data["Time Series (Daily)"];
+                    const dateStr = Object.keys(obj)[0];
+                    let info = stockInfoParser(res.data["Time Series (Daily)"][dateStr]);
+                    user.ownedStocks[i].unit_price = parseInt(info.price, 10)
+                    user.ownedStocks[i].open_price = parseInt(info.opening_price, 10)
+
+                })
+            }
+            user.save()
+            .then(user => res.json({
+                id: user._id,
+                name: user.name,
+                balance: user.balance,
+                transactions: user.transactions,
+                ownedStocks: user.ownedStocks
+            }))
+        } else {
+            return res.status(400).send("No held stocks to update.")
+        }
+    })
+
+   
+});
+
 module.exports = router;
