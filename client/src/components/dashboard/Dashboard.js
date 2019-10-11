@@ -4,23 +4,40 @@ import classnames from "classnames";
 import { connect } from "react-redux";
 
 import { logoutUser } from  "../../actions/authActions";
-import { buyStock } from "../../actions/stockActions";
+import { buyStock, sellStock, updateStocks } from "../../actions/stockActions";
+import { ifError } from "assert";
 
-function HeldStock( {symbol, shares, currentValue}) {
+function HeldStock( {symbol, shares, currentValue, openValue}) {
+
+  let performanceColor = ""
+  if(currentValue > openValue) performanceColor = "green";
+  else if (currentValue < openValue) performanceColor = "red";
+  else performanceColor = "grey";
+
   return (
-  <li>{symbol} - {shares} shares ({currentValue*shares})</li>
+  <li style = {{color: performanceColor}}>{symbol} - {shares} shares ({currentValue*shares})</li>
  );
 }
 
 class Dashboard extends Component {
 
-    constructor() {
-      super();
-      this.state = {
-        symbol: "",
-        quantity: "",
-        errors: {}
-      };
+    constructor(props) {
+        super(props);
+        this.state = {
+            symbol: "",
+            quantity: "",
+            balance: this.props.auth.user.balance,
+            portfolio: this.props.auth.user.ownedStocks,
+            errors: {}
+        };
+    }
+
+    componentDidMount() {
+      const { user } = this.props.auth;
+      this.setState({
+        balance: user.balance,
+        portfolio: user.ownedStocks
+      })
     }
 
     onLogoutClick = e => {
@@ -28,40 +45,99 @@ class Dashboard extends Component {
         this.props.logoutUser();
     };
 
-    onBuyClick = e => {
+    onUpdateClick = e => {
+      e.preventDefault();
+
+      let user = ""
+      if(!this.props.stock.user.data) { user = this.props.auth.user; }
+      else { user = this.props.stock.user.data; }
+
+      this.props.updateStocks(user)
+      let result = this.props.stock.user.data
+      if(result) {
+        this.props.auth.user = result
+        this.setState({
+          portfolio: result.ownedStocks
+        })
+      }
+    }
+
+
+  processRequest = async (user, tradeRequest, stockRequest) => {
+    return new Promise((resolve, reject) => {
+      let result = stockRequest(user, tradeRequest)
+      setTimeout(function() {
+        resolve(result)
+      }, 5000)
+    }).then(result => {
+      return result
+    })
+  };
+
+   onBuyClick = async e => {
       e.preventDefault();
 
       let tradeRequest = {
           symbol: this.state.symbol,
           quantity: this.state.quantity 
       };
-      console.log(this.props.auth.user)
-      this.props.auth.user = this.props.buyStock(this.props.auth.user, tradeRequest);
-      console.log(this.props.auth.user)
-    };
+      let user = ""
+      if(!this.props.stock.user.data) { user = this.props.auth.user; }
+      else { user = this.props.stock.user.data; }
 
-    onSellClick = e => {
+      await this.processRequest(user, tradeRequest, this.props.buyStock)
+      let result = this.props.stock.user.data
+      if(result) {
+        this.props.auth.user = result
+        this.setState({
+          balance: result.balance,
+          portfolio: result.ownedStocks,
+        })
+      }
+  }
 
+    onSellClick = async e => {
+      e.preventDefault();
+
+      let tradeRequest = {
+        symbol: this.state.symbol,
+        quantity: this.state.quantity 
+      };
+
+      let user = ""
+      if(!this.props.stock.user.data) { user = this.props.auth.user }
+      else { user = this.props.stock.user.data }
+
+      await this.processRequest(user, tradeRequest, this.props.sellStock)
+      let result = this.props.stock.user.data
+      if(result) {
+        this.props.auth.user = result
+        this.setState({
+          balance: result.balance,
+          portfolio: result.ownedStocks,
+        })
+      }
     }
 
     onChange = e => {
       this.setState({ [e.target.id]: e.target.value });
   };
 
+
+
     render() {
-        const { user } = this.props.auth;
-        console.log(user)
         const { errors } = this.state;
         let portfolio = undefined
         let portfolioSum = 0
-        if(user.ownedStocks != null) {
-          portfolio = user.ownedStocks.map((stock, ii) => {
-            portfolioSum += stock.quantity*10
+        if(this.state.portfolio != null) {
+          portfolio = this.state.portfolio.map((stock, ii) => {
+            portfolioSum += stock.quantity*stock.unit_price
             return(
               <HeldStock 
                 symbol={stock.symbol}
                 shares={stock.quantity}
-                currentValue={10}
+                currentValue={stock.unit_price}
+                openValue={stock.open_price}
                 key={ii}
                 />
             );
@@ -81,7 +157,7 @@ class Dashboard extends Component {
                     </div>
                     <div className="col s6 center-align">
                       <h4>
-                        Cash: (${user.balance})
+                        Cash: (${this.state.balance})
                       </h4>
                       <input
                         onChange={this.onChange}
@@ -123,10 +199,22 @@ class Dashboard extends Component {
                           letterSpacing: "1.5px",
                           marginTop: "1rem"
                         }}
-                        //onClick={this.onLogoutClick}
+                        onClick={this.onSellClick}
                         className="btn btn-large waves-effect waves-light hoverable blue accent-3"
                       >
                         Sell
+                      </button>
+                      <button
+                        style={{
+                          width: "150px",
+                          borderRadius: "3px",
+                          letterSpacing: "1.5px",
+                          marginTop: "1rem"
+                        }}
+                        onClick={this.onUpdateClick}
+                        className="btn btn-large waves-effect waves-light hoverable blue accent-3"
+                      >
+                        Update Prices
                       </button>
                       <button
                         style={{
@@ -150,14 +238,18 @@ class Dashboard extends Component {
 Dashboard.propTypes = {
     logoutUser: PropTypes.func.isRequired,
     buyStock: PropTypes.func.isRequired,
-    auth: PropTypes.object.isRequired
+    sellStock: PropTypes.func.isRequired,
+    updateStocks: PropTypes.func.isRequired,
+    auth: PropTypes.object.isRequired,
+    user: PropTypes.object.isRequired
 };
 
 const mapStateToProps = state => ({
-    auth: state.auth
+    auth: state.auth,
+    stock: state.stock
 });
 
 export default connect(
     mapStateToProps,
-    { logoutUser, buyStock }
+    { logoutUser, buyStock, sellStock, updateStocks }
   )(Dashboard);

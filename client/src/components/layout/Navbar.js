@@ -1,6 +1,7 @@
 import React, { Component } from "react";
 import { Link } from "react-router-dom";
 
+
 class Navbar extends Component {
     render() {
         return (
@@ -15,7 +16,29 @@ class Navbar extends Component {
                         className="col s5 brand-logo center black-text"
                         >
                             <i className="material-icons">code</i>
-                            Stonk Trading
+                            Stock Trading
+                        </Link>
+                        <Link
+                        to="/Dashboard" 
+                        style={{
+                            fontFamily: "monospace",
+                            fontWeight: "bold",
+                            padding: "16dp"
+                        }}
+                        className="col s3 black-text"
+                        >
+                            Portfolio
+                        </Link>
+                        <Link
+                        to="/History" 
+                        style={{
+                            fontFamily: "monospace",
+                            fontWeight: "bold",
+                            padding: "16dp"
+                        }}
+                        className="col s3 black-text"
+                        >
+                            Transactions
                         </Link>
                     </div>
                 </nav>

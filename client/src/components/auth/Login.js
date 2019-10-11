@@ -22,7 +22,7 @@ class Login extends Component {
       }
     }
 
-    /*
+    // deprecated
     componentWillReceiveProps(nextProps) {
         if (nextProps.auth.isAuthenticated) {
           this.props.history.push("/dashboard"); // push user to dashboard when they login
@@ -32,9 +32,9 @@ class Login extends Component {
             errors: nextProps.errors
           });
         }
-      } */
+      } 
     
-    static getDerivedStateFromProps(nextProps) {
+ /*   static getDerivedStateFromProps(nextProps) {
       if (nextProps.auth.isAuthenticated) {
         return { history: ("/dashboard") }// push user to dashboard when they login
       }
@@ -44,7 +44,7 @@ class Login extends Component {
         };
       }
     }
-
+*/
     onChange = e => {
         this.setState({ [e.target.id]: e.target.value });
     };
@@ -56,9 +56,6 @@ class Login extends Component {
             email: this.state.email,
             password: this.state.password
         };
-
-        console.log(userData);
-
         this.props.loginUser(userData); // since we handle the redirect within our component, we don't need to pass in this.props.history as a parameter
     };
 
