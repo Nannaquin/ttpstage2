@@ -9,6 +9,14 @@ const heldStockSchema = new Schema({
   quantity: {
     type: Number,
     required: true
+  },
+  unit_price: {
+    type: Number,
+    required: true
+  },
+  open_price: {
+    type: Number,
+    required: true
   }
 });
 
