@@ -1,5 +1,6 @@
 # ttpstage2
-A full stack web app designed to be a stock trading platform
+A full stack web app designed to be a stock trading platform.
+Uses the MERN Stack (MongoDB, Express.js, React.js, Node.js).
 
 Note: npm install will have to be run both in the root folder and the client folder.
 
