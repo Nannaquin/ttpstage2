@@ -55,7 +55,8 @@ class History extends Component {
         return(
             <div style={{ height: "75vh" }} className="container valign-wrapper">
               <div className="row">
-                <div className="col s12 left-align">
+                <div className="col s12 center-align">
+                <h3>Transaction Record</h3>
                     <ul>
                     {transactions}
                     </ul>

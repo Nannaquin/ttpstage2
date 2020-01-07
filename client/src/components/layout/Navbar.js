@@ -5,44 +5,45 @@ import { Link } from "react-router-dom";
 class Navbar extends Component {
     render() {
         return (
-            <div className="navbar-fixed">
-                <nav className="z-depth-0">
-                    <div className="nav-wrapper white">
-                        <Link 
-                        to="/"
-                        style={{
-                            fontFamily: "monospace"
-                        }}
-                        className="col s5 brand-logo center black-text"
+            <nav className="navbar navbar-dark" style={{background:"white"}}>
+
+                <ul>
+                    <li>
+                        <Link className="black-text" 
+                            to="/" 
+                            style = {{ fontFamily: "monospace"}}
                         >
-                            <i className="material-icons">code</i>
-                            Stock Trading
+                        Virtual Stock Trading
                         </Link>
-                        <Link
-                        to="/Dashboard" 
-                        style={{
-                            fontFamily: "monospace",
-                            fontWeight: "bold",
-                            padding: "16dp"
-                        }}
-                        className="col s3 black-text"
-                        >
-                            Portfolio
-                        </Link>
-                        <Link
-                        to="/History" 
-                        style={{
-                            fontFamily: "monospace",
-                            fontWeight: "bold",
-                            padding: "16dp"
-                        }}
-                        className="col s3 black-text"
-                        >
-                            Transactions
-                        </Link>
-                    </div>
-                </nav>
-            </div>
+                    </li>
+                    <li>
+                        <Link className="col s3 black-text"
+                            to="/Dashboard"
+                            style={{
+                                color: "grey",
+                                fontFamily: "monospace",
+                                fontWeight: "bold",
+                                padding: "16dp"                                
+                            }}
+                            >
+                                Portfolio
+                            </Link>
+                    </li>
+                    <li>
+                        <Link className="col s3 black-text"
+                            to="/History"
+                            style={{
+                                color: "grey",
+                                fontFamily: "monospace",
+                                fontWeight: "bold",
+                                padding: "16dp"                                
+                            }}
+                            >
+                                Transactions
+                            </Link>
+                    </li>
+                </ul>
+            </nav>
         );
     }
 }
