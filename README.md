@@ -19,6 +19,8 @@ I was tasked with creating a full stack web app that would allow users to buy an
 ## User Authentication
 
 ## Stock Data
+I chose to use the the (https://www.alphavantage.co/)[AlphaVantage API] for my stock data as it was accessable and provided data in the minimum frequency that was required (daily). 
 
 
 ## Databases
+I chose MongoDB, and by extension Mongoose.js (ORM) and MongoDB Atlas due to its quick prior experience with the technology due to its ability to access data quickly and prior experience with it in my Big Data class.
